@@ -32,6 +32,9 @@ DIM grassimg(129)
 DIM treeimg(129)
 DIM playerimg(129)
 
+' $DYNAMIC
+DIM alltiles(0)
+
 ' Data about the player
 TYPE playertype
   x AS INTEGER
@@ -60,6 +63,23 @@ READ tacross, tdown
 READ player.x, player.y
 
 DIM tile(tacross - 1, tdown - 1) AS tiletype
+
+DEF FNLoadTiles
+  OPEN "TILES.DAT" FOR BINARY ACCESS READ AS #1
+  GET #1,,numtiles
+  REDIM alltiles(numtiles * 130 - 1)
+  FOR i = 0 TO numtiles * 130 - 1
+    GET #1,,alltiles(i)
+  NEXT i
+  CLOSE #1
+
+  PRINT numtiles
+  FOR i = 0 TO 15
+    PUT (i * 16, 16), alltiles(i * 130), PSET
+  NEXT i
+  SLEEP
+  CLS
+END DEF
 
 DEF FNLoadMap
   FOR d = 0 TO tdown - 1
@@ -139,6 +159,7 @@ END DEF
 ' function, and ignore the return value
 ' Could use SUB, but that still requires CALL, etc...
 
+dummy = FNLoadTiles
 dummy = FNLoadMap
 
 ' Load black screen into the black tile image
