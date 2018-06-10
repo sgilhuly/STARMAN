@@ -27,13 +27,8 @@ CONST XOFFSET = 12
 CONST YOFFSET = 12
 
 ' Each image takes 130 bytes, (16*16 + 4) / 2
-DIM blankimg(129)
-DIM grassimg(129)
-DIM treeimg(129)
-DIM playerimg(129)
-
 ' $DYNAMIC
-DIM alltiles(0)
+DIM tileimg(0)
 
 ' Data about the player
 TYPE playertype
@@ -65,20 +60,22 @@ READ player.x, player.y
 DIM tile(tacross - 1, tdown - 1) AS tiletype
 
 DEF FNLoadTiles
-  OPEN "TILES.DAT" FOR BINARY ACCESS READ AS #1
-  GET #1,,numtiles
-  REDIM alltiles(numtiles * 130 - 1)
+  file = FREEFILE
+  OPEN "TILES.DAT" FOR BINARY ACCESS READ AS file
+  GET file,,numtiles
+  REDIM tileimg(numtiles * 130 - 1)
   FOR i = 0 TO numtiles * 130 - 1
-    GET #1,,alltiles(i)
+    GET file,,tileimg(i)
   NEXT i
-  CLOSE #1
+  CLOSE file
 
-  PRINT numtiles
-  FOR i = 0 TO 15
-    PUT (i * 16, 16), alltiles(i * 130), PSET
-  NEXT i
-  SLEEP
-  CLS
+' Graphics test
+'  PRINT numtiles
+'  FOR i = 0 TO 15
+'    PUT (i * 16, 16), tileimg(i * 130), PSET
+'  NEXT i
+'  SLEEP
+'  CLS
 END DEF
 
 DEF FNLoadMap
@@ -105,15 +102,8 @@ END DEF
 'the tx and ty variables are the tile numbers out of all the tiles
 'the cx and cy variables are locations of the tile spaces where the tiles
 'will be displayed on the screen
-DEF FNDrawTile (tx, ty, cx, cy)
-  SELECT CASE tile(tx, ty).back  'check the tile's style
-    CASE 0
-      PUT (cx, cy), blankimg, PSET
-    CASE 1
-      PUT (cx, cy), grassimg, PSET
-    CASE 2
-      PUT (cx, cy), treeimg, PSET
-  END SELECT
+DEF FNDrawTile (tile, cx, cy)
+  PUT (cx, cy), tileimg(tile * 130), PSET
 END DEF
 
 ' Draw all of the tiles visible to the camera
@@ -124,7 +114,7 @@ DEF FNDrawScreen
       ty = camera.y + rely
       cx = relx * SIZE + XOFFSET
       cy = rely * SIZE + YOFFSET
-      dummy = FNDrawTile(tx, ty, cx, cy)
+      dummy = FNDrawTile(tile(tx, ty).back, cx, cy)
     NEXT rely
   NEXT relx
 END DEF
@@ -133,18 +123,7 @@ END DEF
 DEF FNDrawPlayer
   cx = (player.x - camera.x) * SIZE + XOFFSET
   cy = (player.y - camera.y) * SIZE + YOFFSET
-  PUT (cx, cy), playerimg, PSET
-END DEF
-
-' Read image data from a data block and display it in the top left corner
-DEF FNDisplayImg
-  FOR dp = 0 TO SIZE - 1
-    FOR ap = 0 TO SIZE - 1
-      ' Read and draw the pixel
-      READ att
-      PSET (ap, dp), att
-    NEXT ap
-  NEXT dp
+  dummy = FNDrawTile(7, cx, cy)
 END DEF
 
 DEF FNMovePlayer (relx, rely)
@@ -161,25 +140,6 @@ END DEF
 
 dummy = FNLoadTiles
 dummy = FNLoadMap
-
-' Load black screen into the black tile image
-GET (0, 0)-(15, 15), blankimg
-
-' Set the data pointer, draw the data, load into an array, then clear with XOR
-RESTORE grassdata
-dummy = FNDisplayImg
-GET (0, 0)-(15, 15), grassimg
-PUT (0, 0), grassimg, XOR
-
-RESTORE treedata
-dummy = FNDisplayImg
-GET (0, 0)-(15, 15), treeimg
-PUT (0, 0), treeimg, XOR
-
-RESTORE playerdata
-dummy = FNDisplayImg
-GET (0, 0)-(15, 15), playerimg
-PUT (0, 0), playerimg, XOR
 
 DO
   ' Draw the player, and the screen around the player
@@ -217,78 +177,22 @@ DATA 21,21
 DATA 11,11
 DATA 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
 DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,2,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,2
+DATA 2,3,1,1,1,1,1,1,1,1,1,3,1,1,6,6,6,1,6,6,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,6,6,6,1,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,3,3,6,6,6,6,6,1,1,2
+DATA 2,1,1,1,1,1,1,1,1,1,3,3,3,3,3,3,3,6,6,6,2
+DATA 2,1,1,1,1,3,1,1,1,1,1,8,9,11,4,5,3,3,6,6,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,12,13,15,1,2,2,2,3,6,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,2,2,2,2
+DATA 2,3,1,1,1,1,1,3,1,1,1,1,1,1,3,3,3,3,3,3,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,3,2
+DATA 2,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,3,1,1,1,2
+DATA 2,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
+DATA 2,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,2
+DATA 2,3,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,3,1,1,2
 DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,2,1,1,1,1,1,2,1,1,1,1,1,2,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,2,1,1,1,1,1,2,1,1,1,1,1,1,2,1,1,1,1,2,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,2,1,1,1,2
-DATA 2,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,2,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,2,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,1,1,2,1,2
+DATA 2,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,2
+DATA 2,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,2
+DATA 2,1,3,1,1,1,1,1,1,1,1,3,1,1,3,1,1,1,3,1,2
 DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
 DATA 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
-
-' 16 is black, 0 is transparent
-grassdata:
-DATA 0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,2,0,0,0,0,0,0,0,0,2,0,0,2,0
-DATA 0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0
-DATA 0,0,2,0,0,0,0,0,2,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0
-DATA 0,2,0,2,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,2,0,0,0,2,0,2,0,0
-DATA 0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0
-DATA 0,2,0,0,2,0,0,0,0,0,2,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,2,0,0,0,0,0,0,0,0,2,0
-DATA 0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0
-DATA 0,0,0,0,0,2,0,0,0,0,0,2,0,0,0,0
-DATA 0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0
-
-treedata:
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0
-DATA 0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0
-DATA 0,0,0,2,2,2,2,2,2,2,2,0,0,0,0,0
-DATA 0,0,0,2,2,2,2,2,2,2,2,0,0,0,0,0
-DATA 0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0
-DATA 0,0,0,0,0,2,6,6,2,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,6,6,6,6,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-playerdata:
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,4,4,4,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,12,12,12,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,12,12,12,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,0,12,0,0,0,0,0,0,0,0
-DATA 0,0,0,0,13,13,6,6,6,13,13,0,0,0,0,0
-DATA 0,0,0,12,0,13,13,6,13,13,0,12,0,0,0,0
-DATA 0,0,12,0,0,0,13,6,13,0,0,0,12,0,0,0
-DATA 0,12,0,0,0,0,13,6,13,0,0,0,0,12,12,0
-DATA 0,12,0,0,0,0,1,1,1,0,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,13,13,13,13,0,0,0,0,0,0
-DATA 0,0,0,0,0,0,13,0,0,0,13,0,0,0,0,0
-DATA 0,0,0,0,0,0,13,0,0,0,0,13,0,0,0,0
-DATA 0,0,0,0,0,13,0,0,0,0,0,13,0,0,0,0
-DATA 0,0,0,0,13,0,0,0,0,0,0,13,0,0,0,0
-DATA 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
