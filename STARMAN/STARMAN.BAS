@@ -20,15 +20,13 @@ PALETTE 13, 3289115
 PALETTE 14, 1520950
 PALETTE 15, 3488567
 
-CONST ACROSS = 11
-CONST DOWN = 11
+CONST CAMWIDTH = 11
+CONST CAMHEIGHT = 11
 CONST SIZE = 16
 CONST XOFFSET = 12
 CONST YOFFSET = 12
-
-' Each image takes 130 bytes, (16*16 + 4) / 2
-' $DYNAMIC
-DIM tileimg(0)
+CONST MASKWALK = 1
+CONST MASKWATER = 2
 
 ' Data about the player
 TYPE playertype
@@ -49,16 +47,16 @@ TYPE tiletype
   solid AS INTEGER  ' Does this tile block movement?
 END TYPE
 
+' Each image takes 130 bytes, (16*16 + 4) / 2
+' $DYNAMIC
+DIM tileimg(0)
+
 DIM player AS playertype
 DIM camera AS cameratype
+DIM tile(0, 0) AS tiletype
+DIM mapwidth, mapheight AS INTEGER
 
-' Read world size and player location from the "world" data pointer
-RESTORE world
-READ tacross, tdown
-READ player.x, player.y
-
-DIM tile(tacross - 1, tdown - 1) AS tiletype
-
+' Load tile image data from the file TILES.DAT
 DEF FNLoadTiles
   file = FREEFILE
   OPEN "TILES.DAT" FOR BINARY ACCESS READ AS file
@@ -68,23 +66,23 @@ DEF FNLoadTiles
     GET file,,tileimg(i)
   NEXT i
   CLOSE file
-
-' Graphics test
-'  PRINT numtiles
-'  FOR i = 0 TO 15
-'    PUT (i * 16, 16), tileimg(i * 130), PSET
-'  NEXT i
-'  SLEEP
-'  CLS
 END DEF
 
-DEF FNLoadMap
-  FOR d = 0 TO tdown - 1
-    FOR a = 0 TO tacross - 1
-      READ tile(a, d).back  'read the tile's style
-      IF tile(a, d).back = 2 THEN tile(a, d).solid = 1 ELSE tile(a, d).solid = 0
+' Load map data from a file
+' The map switch trigger should set the player's location
+DEF FNLoadMap (mapfile$)
+  file = FREEFILE
+  OPEN mapfile$ FOR BINARY ACCESS READ AS file
+  GET file,,mapwidth
+  GET file,,mapheight
+  REDIM tile(mapwidth, mapheight)
+  FOR d = 0 TO mapheight - 1
+    FOR a = 0 TO mapwidth - 1
+      GET file,,tile(a, d).back
+      GET file,,tile(a, d).solid
     NEXT a
   NEXT d
+  CLOSE file
 END DEF
 
 ' Follow the player with the camera, constrain to edges of the world
@@ -92,11 +90,10 @@ DEF FNCameraFollow
   camera.x = player.x - 5
   camera.y = player.y - 5
   IF camera.x < 0 THEN camera.x = 0
-  IF camera.x > tacross - ACROSS THEN camera.x = tacross - ACROSS
+  IF camera.x > mapwidth - CAMWIDTH THEN camera.x = mapwidth - CAMWIDTH
   IF camera.y < 0 THEN camera.y = 0
-  IF camera.y > tdown - DOWN THEN camera.y = tdown - DOWN
+  IF camera.y > mapheight - CAMHEIGHT THEN camera.y = mapheight - CAMHEIGHT
 END DEF
-
 
 'this next routine draws the tile on the screen
 'the tx and ty variables are the tile numbers out of all the tiles
@@ -108,8 +105,8 @@ END DEF
 
 ' Draw all of the tiles visible to the camera
 DEF FNDrawScreen
-  FOR relx = 0 TO ACROSS - 1
-    FOR rely = 0 TO DOWN - 1
+  FOR relx = 0 TO CAMWIDTH - 1
+    FOR rely = 0 TO CAMHEIGHT - 1
       tx = camera.x + relx
       ty = camera.y + rely
       cx = relx * SIZE + XOFFSET
@@ -123,11 +120,11 @@ END DEF
 DEF FNDrawPlayer
   cx = (player.x - camera.x) * SIZE + XOFFSET
   cy = (player.y - camera.y) * SIZE + YOFFSET
-  dummy = FNDrawTile(7, cx, cy)
+  dummy = FNDrawTile(83, cx, cy)
 END DEF
 
 DEF FNMovePlayer (relx, rely)
-  IF tile(player.x + relx, player.y + rely).solid = 0 THEN
+  IF (tile(player.x + relx, player.y + rely).solid AND MASKWALK) > 0 THEN
     player.x = player.x + relx
     player.y = player.y + rely
   END IF
@@ -139,7 +136,9 @@ END DEF
 ' Could use SUB, but that still requires CALL, etc...
 
 dummy = FNLoadTiles
-dummy = FNLoadMap
+dummy = FNLoadMap("TESTMAP.MAP")
+player.x = 21
+player.y = 14
 
 DO
   ' Draw the player, and the screen around the player
@@ -169,30 +168,3 @@ getinput:
     GOTO getinput
   END IF
 LOOP
-
-
-world:
-
-DATA 21,21
-DATA 11,11
-DATA 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,3,1,1,1,1,1,1,1,1,1,3,1,1,6,6,6,1,6,6,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,6,6,6,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,3,3,6,6,6,6,6,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,3,3,3,3,3,3,3,6,6,6,2
-DATA 2,1,1,1,1,3,1,1,1,1,1,8,9,11,4,5,3,3,6,6,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,12,13,15,1,2,2,2,3,6,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,2,2,2,2
-DATA 2,3,1,1,1,1,1,3,1,1,1,1,1,1,3,3,3,3,3,3,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,3,2
-DATA 2,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,3,1,1,1,2
-DATA 2,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,3,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,3,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,2
-DATA 2,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,1,3,1,1,1,1,1,1,1,1,3,1,1,3,1,1,1,3,1,2
-DATA 2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2
-DATA 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2

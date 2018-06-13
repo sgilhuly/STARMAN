@@ -1,5 +1,5 @@
 from PIL import Image
-palette = Image.open('palette.png')
+palette = Image.open('assets/palette.png')
 
 # Assumes a 16x1 image
 for i in range(16):

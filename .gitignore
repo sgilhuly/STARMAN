@@ -105,3 +105,4 @@ venv.bak/
 
 # Generated tile graphics data
 STARMAN/TILES.DAT
+STARMAN/*.MAP
