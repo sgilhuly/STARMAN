@@ -3,10 +3,10 @@ from PIL import Image
 SIZE = 16
 
 # TILES.DAT format:
-# number of images (2B)
+# number of images
 # for each image:
-#   128 (2B)
-#   16 (2B)
+#   128
+#   16
 #   256 x pixel (1B each)
 
 # tiles.png should be a grid of 16x16 images, in indexed mode

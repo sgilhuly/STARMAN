@@ -2,6 +2,8 @@ DEFINT A-Z  'declare all variables starting with a through z as integers
 SCREEN 13   'set screen mode 13, 320x200x256
 CLS
 
+' http://www.petesqbsite.com/sections/tutorials/zines/qbtm/5-scripting.html
+
 ' Load the Dawnbringer 16 palette
 PALETTE 0, 459525
 PALETTE 1, 854289
@@ -23,10 +25,12 @@ PALETTE 15, 3488567
 CONST CAMWIDTH = 11
 CONST CAMHEIGHT = 11
 CONST SIZE = 16
+CONST IMGSIZE = 130  ' Each image takes 130 bytes, (16*16 + 4) / 2
 CONST XOFFSET = 12
 CONST YOFFSET = 12
 CONST MASKWALK = 1
 CONST MASKWATER = 2
+CONST PLAYERTILE = 83
 
 ' Data about the player
 TYPE playertype
@@ -43,26 +47,39 @@ END TYPE
 ' Data about each tile
 TYPE tiletype
   back AS INTEGER   ' Background tile index
-  fore AS INTEGER   ' Foreground
   solid AS INTEGER  ' Does this tile block movement?
 END TYPE
 
-' Each image takes 130 bytes, (16*16 + 4) / 2
-' $DYNAMIC
-DIM tileimg(0)
+' Data about each script
+TYPE scripttype
+  x1 AS INTEGER
+  y1 AS INTEGER
+  x2 AS INTEGER
+  y2 AS INTEGER
+END TYPE
 
-DIM player AS playertype
-DIM camera AS cameratype
-DIM tile(0, 0) AS tiletype
-DIM mapwidth, mapheight AS INTEGER
+' Data about the map, contains tiles and scripts
+' Not allowed to use arrays or variable length strings in user data types
+' Fortunately only one map is loaded at once
+DIM SHARED mapwidth, mapheight, numscripts AS INTEGER
+' $DYNAMIC
+DIM SHARED tiles(0, 0) AS tiletype
+DIM SHARED scriptinfo(0) AS scripttype
+DIM SHARED scripttext(0) AS STRING
+
+' $DYNAMIC
+DIM SHARED tileimg(0)
+
+DIM SHARED player AS playertype
+DIM SHARED camera AS cameratype
 
 ' Load tile image data from the file TILES.DAT
 DEF FNLoadTiles
   file = FREEFILE
   OPEN "TILES.DAT" FOR BINARY ACCESS READ AS file
   GET file,,numtiles
-  REDIM tileimg(numtiles * 130 - 1)
-  FOR i = 0 TO numtiles * 130 - 1
+  REDIM tileimg(numtiles * IMGSIZE - 1)
+  FOR i = 0 TO numtiles * IMGSIZE - 1
     GET file,,tileimg(i)
   NEXT i
   CLOSE file
@@ -75,13 +92,28 @@ DEF FNLoadMap (mapfile$)
   OPEN mapfile$ FOR BINARY ACCESS READ AS file
   GET file,,mapwidth
   GET file,,mapheight
-  REDIM tile(mapwidth, mapheight)
-  FOR d = 0 TO mapheight - 1
-    FOR a = 0 TO mapwidth - 1
-      GET file,,tile(a, d).back
-      GET file,,tile(a, d).solid
-    NEXT a
-  NEXT d
+  REDIM tiles(mapwidth - 1, mapheight - 1)
+  FOR y = 0 TO mapheight - 1
+    FOR x = 0 TO mapwidth - 1
+      GET file,,tiles(x, y).back
+      GET file,,tiles(x, y).solid
+    NEXT x
+  NEXT y
+  GET file,,numscripts
+  REDIM scriptinfo(numscripts - 1)
+  REDIM scripttext(numscripts - 1)
+  FOR i = 0 TO numscripts - 1
+    GET file,,scriptinfo(i).x1
+    GET file,,scriptinfo(i).y1
+    GET file,,scriptinfo(i).x2
+    GET file,,scriptinfo(i).y2
+    GET file,,scriptlength
+    ' Set the length of the string so that many bytes will be read
+    scripttext(i) = STRING$(scriptlength, " ")
+    GET file,,scripttext(i)
+    PRINT scripttext(i)
+    SLEEP
+  NEXT i
   CLOSE file
 END DEF
 
@@ -95,12 +127,9 @@ DEF FNCameraFollow
   IF camera.y > mapheight - CAMHEIGHT THEN camera.y = mapheight - CAMHEIGHT
 END DEF
 
-'this next routine draws the tile on the screen
-'the tx and ty variables are the tile numbers out of all the tiles
-'the cx and cy variables are locations of the tile spaces where the tiles
-'will be displayed on the screen
+'Draw a tile at pixel coordinates
 DEF FNDrawTile (tile, cx, cy)
-  PUT (cx, cy), tileimg(tile * 130), PSET
+  PUT (cx, cy), tileimg(tile * IMGSIZE), PSET
 END DEF
 
 ' Draw all of the tiles visible to the camera
@@ -111,7 +140,7 @@ DEF FNDrawScreen
       ty = camera.y + rely
       cx = relx * SIZE + XOFFSET
       cy = rely * SIZE + YOFFSET
-      dummy = FNDrawTile(tile(tx, ty).back, cx, cy)
+      dummy = FNDrawTile(tiles(tx, ty).back, cx, cy)
     NEXT rely
   NEXT relx
 END DEF
@@ -120,11 +149,11 @@ END DEF
 DEF FNDrawPlayer
   cx = (player.x - camera.x) * SIZE + XOFFSET
   cy = (player.y - camera.y) * SIZE + YOFFSET
-  dummy = FNDrawTile(83, cx, cy)
+  dummy = FNDrawTile(PLAYERTILE, cx, cy)
 END DEF
 
 DEF FNMovePlayer (relx, rely)
-  IF (tile(player.x + relx, player.y + rely).solid AND MASKWALK) > 0 THEN
+  IF (tiles(player.x + relx, player.y + rely).solid AND MASKWALK) > 0 THEN
     player.x = player.x + relx
     player.y = player.y + rely
   END IF
