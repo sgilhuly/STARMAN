@@ -2,6 +2,7 @@ DEFINT A-Z  'declare all variables starting with a through z as integers
 SCREEN 13   'set screen mode 13, 320x200x256
 VIEW PRINT 17 TO 25
 CLS
+_FULLSCREEN
 
 ' http://www.petesqbsite.com/sections/tutorials/zines/qbtm/5-scripting.html
 
@@ -64,18 +65,50 @@ END TYPE
 ' Fortunately only one map is loaded at once
 DIM SHARED mapwidth, mapheight, numscripts AS INTEGER
 ' $DYNAMIC
+DIM SHARED tileimg(0)
 DIM SHARED tiles(0, 0) AS tiletype
 DIM SHARED scriptinfo(0) AS scripttype
 DIM SHARED scripttext(0) AS STRING
 
-' $DYNAMIC
-DIM SHARED tileimg(0)
-
 DIM SHARED player AS playertype
 DIM SHARED camera AS cameratype
 
+CALL LoadTiles
+CALL LoadMap("DESERT.MAP")
+player.x = 29
+player.y = 14
+
+DO
+  ' Draw the player, and the screen around the player
+  CALL CameraFollow
+  CALL DrawScreen
+  CALL DrawPlayer
+
+getinput:
+  kbd$ = INKEY$            'get a "transparent" input
+  IF kbd$ <> "" THEN
+    kbd$ = RIGHT$(kbd$, 1) 'get the first byte of the input
+    SELECT CASE kbd$
+      CASE CHR$(27) 'user pressed escape key
+        END
+      CASE CHR$(72) 'user pressed up arrow
+        CALL MovePlayer(0, -1)
+      CASE CHR$(80) 'user pressed down arrow
+        CALL MovePlayer(0, 1)
+      CASE CHR$(75) 'user pressed left arrow
+        CALL MovePlayer(-1, 0)
+      CASE CHR$(77) 'user pressed right arrow
+        CALL MovePlayer(1, 0)
+      CASE ELSE     'don't redraw screen
+        GOTO getinput
+    END SELECT
+  ELSE
+    GOTO getinput
+  END IF
+LOOP
+
 ' Load tile image data from the file TILES.DAT
-DEF FNLoadTiles
+SUB LoadTiles
   file = FREEFILE
   OPEN "TILES.DAT" FOR BINARY ACCESS READ AS file
   GET file,,numtiles
@@ -84,16 +117,16 @@ DEF FNLoadTiles
     GET file,,tileimg(i)
   NEXT i
   CLOSE file
-END DEF
+END SUB
 
 ' Load map data from a file
 ' The map switch trigger should set the player's location
-DEF FNLoadMap (mapfile$)
+SUB LoadMap (mapfile$)
   file = FREEFILE
   OPEN mapfile$ FOR BINARY ACCESS READ AS file
   GET file,,mapwidth
   GET file,,mapheight
-  REDIM tiles(mapwidth - 1, mapheight - 1)
+  REDIM tiles(mapwidth - 1, mapheight - 1) AS tiletype
   FOR y = 0 TO mapheight - 1
     FOR x = 0 TO mapwidth - 1
       GET file,,tiles(x, y).back
@@ -101,8 +134,8 @@ DEF FNLoadMap (mapfile$)
     NEXT x
   NEXT y
   GET file,,numscripts
-  REDIM scriptinfo(numscripts - 1)
-  REDIM scripttext(numscripts - 1)
+  REDIM scriptinfo(numscripts - 1) AS scripttype
+  REDIM scripttext(numscripts - 1) AS STRING
   FOR i = 0 TO numscripts - 1
     GET file,,scriptinfo(i).x1
     GET file,,scriptinfo(i).y1
@@ -114,9 +147,9 @@ DEF FNLoadMap (mapfile$)
     GET file,,scripttext(i)
   NEXT i
   CLOSE file
-END DEF
+END SUB
 
-DEF FNParseLine (line$, n)
+SUB ParseLine (line$, n)
   IF MID$(line$, 1, 1) <> "#" THEN
     spacebreak = INSTR(line$, " ")
     IF spacebreak > 0 THEN
@@ -140,20 +173,20 @@ DEF FNParseLine (line$, n)
         xdiff = player.x - scriptinfo(n).x1
         ydiff = player.y - scriptinfo(n).y1
         spacebreak = INSTR(parameter$, " ")
-        dummy = FNLoadMap(MID$(parameter$, 1, spacebreak - 1))
+        CALL LoadMap(MID$(parameter$, 1, spacebreak - 1))
         parameter$ = MID$(line$, spacebreak + 1)
         spacebreak = INSTR(parameter$, " ")
-        player.x = VAL(MID$(parameter$, 1, spacebreak - 1)) + xdiff
-        player.y = VAL(MID$(parameter$, spacebreak + 1)) + ydiff
+        player.x = VAL(MID$(parameter$, 1, spacebreak - 1))'' + xdiff
+        player.y = VAL(MID$(parameter$, spacebreak + 1))'' + ydiff
       CASE ELSE
         PRINT "Script error!"
         PRINT line$
     END SELECT
   END IF
-END DEF
+END SUB
 
 ' Run a script defined in the map
-DEF FNParseScript (n)
+SUB ParseScript (n)
   ' Wouldn't be basic without these dollar signs...
   script$ = scripttext(n)
   line$ = ""
@@ -167,95 +200,56 @@ DEF FNParseScript (n)
       line$ = script$
       script$ = ""
     END IF
-    dummy = FNParseLine(line$, n)
+    CALL ParseLine(line$, n)
   WEND
-END DEF
+END SUB
 
 ' Follow the player with the camera, constrain to edges of the world
-DEF FNCameraFollow
+SUB CameraFollow
   camera.x = player.x - (CAMWIDTH - 1) / 2
   camera.y = player.y - (CAMHEIGHT - 1) / 2
   IF camera.x < 0 THEN camera.x = 0
   IF camera.x > mapwidth - CAMWIDTH THEN camera.x = mapwidth - CAMWIDTH
   IF camera.y < 0 THEN camera.y = 0
   IF camera.y > mapheight - CAMHEIGHT THEN camera.y = mapheight - CAMHEIGHT
-END DEF
+END SUB
 
 'Draw a tile at pixel coordinates
-DEF FNDrawTile (tile, cx, cy)
+SUB DrawTile (tile, cx, cy)
   PUT (cx, cy), tileimg(tile * IMGSIZE), PSET
-END DEF
+END SUB
 
 ' Draw all of the tiles visible to the camera
-DEF FNDrawScreen
+SUB DrawScreen
   FOR relx = 0 TO CAMWIDTH - 1
     FOR rely = 0 TO CAMHEIGHT - 1
       tx = camera.x + relx
       ty = camera.y + rely
       cx = relx * SIZE + XOFFSET
       cy = rely * SIZE + YOFFSET
-      dummy = FNDrawTile(tiles(tx, ty).back, cx, cy)
+      CALL DrawTile(tiles(tx, ty).back, cx, cy)
     NEXT rely
   NEXT relx
-END DEF
+END SUB
 
 ' Draw the player on screen, offset by camera location
-DEF FNDrawPlayer
+SUB DrawPlayer
   cx = (player.x - camera.x) * SIZE + XOFFSET
   cy = (player.y - camera.y) * SIZE + YOFFSET
-  dummy = FNDrawTile(PLAYERTILE, cx, cy)
-END DEF
+  CALL DrawTile(PLAYERTILE, cx, cy)
+END SUB
 
-DEF FNMovePlayer (relx, rely)
+SUB MovePlayer (relx, rely)
   IF (tiles(player.x + relx, player.y + rely).solid AND MASKWALK) > 0 THEN
     player.x = player.x + relx
     player.y = player.y + rely
 
     FOR i = 0 TO numscripts - 1
-      IF player.x >= scriptinfo[i].x1 AND player.x <= scriptinfo[i].x2 AND _
-          player.y >= scriptinfo[i].y1 AND player.y <= scriptinfo[i].y2 THEN
-        dummy = FNParseScript(i)
+      IF player.x >= scriptinfo(i).x1 AND player.x <= scriptinfo(i).x2 AND _
+          player.y >= scriptinfo(i).y1 AND player.y <= scriptinfo(i).y2 THEN
+        CALL ParseScript(i)
         EXIT FOR
       END IF
     NEXT i
   END IF
-END DEF
-
-' Functions need FN at the start of their name
-' Can't call the function on a line by itself, so dummy is used to call the
-' function, and ignore the return value
-' Could use SUB, but that still requires CALL, etc...
-
-dummy = FNLoadTiles
-dummy = FNLoadMap("DESERT.MAP")
-player.x = 29
-player.y = 14
-
-DO
-  ' Draw the player, and the screen around the player
-  dummy = FNCameraFollow
-  dummy = FNDrawScreen
-  dummy = FNDrawPlayer
-
-getinput:
-  kbd$ = INKEY$            'get a "transparent" input
-  IF kbd$ <> "" THEN
-    kbd$ = RIGHT$(kbd$, 1) 'get the first byte of the input
-    SELECT CASE kbd$
-      CASE CHR$(27) 'user pressed escape key
-        END
-      CASE CHR$(72) 'user pressed up arrow
-        dummy = FNMovePlayer(0, -1)
-      CASE CHR$(80) 'user pressed down arrow
-        dummy = FNMovePlayer(0, 1)
-      CASE CHR$(75) 'user pressed left arrow
-        dummy = FNMovePlayer(-1, 0)
-      CASE CHR$(77) 'user pressed right arrow
-        dummy = FNMovePlayer(1, 0)
-      CASE ELSE     'don't redraw screen
-        GOTO getinput
-    END SELECT
-  ELSE
-    GOTO getinput
-  END IF
-LOOP
+END SUB
