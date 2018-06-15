@@ -1,5 +1,6 @@
 DEFINT A-Z  'declare all variables starting with a through z as integers
 SCREEN 13   'set screen mode 13, 320x200x256
+VIEW PRINT 17 TO 25
 CLS
 
 ' http://www.petesqbsite.com/sections/tutorials/zines/qbtm/5-scripting.html
@@ -22,12 +23,12 @@ PALETTE 13, 3289115
 PALETTE 14, 1520950
 PALETTE 15, 3488567
 
-CONST CAMWIDTH = 11
-CONST CAMHEIGHT = 11
+CONST CAMWIDTH = 15
+CONST CAMHEIGHT = 7
 CONST SIZE = 16
 CONST IMGSIZE = 130  ' Each image takes 130 bytes, (16*16 + 4) / 2
-CONST XOFFSET = 12
-CONST YOFFSET = 12
+CONST XOFFSET = 40
+CONST YOFFSET = 8
 CONST MASKWALK = 1
 CONST MASKWATER = 2
 CONST PLAYERTILE = 83
@@ -108,19 +109,52 @@ DEF FNLoadMap (mapfile$)
     GET file,,scriptinfo(i).x2
     GET file,,scriptinfo(i).y2
     GET file,,scriptlength
-    ' Set the length of the string so that many bytes will be read
+    ' Set the length of the string, which determines the number of bytes read
     scripttext(i) = STRING$(scriptlength, " ")
     GET file,,scripttext(i)
-    PRINT scripttext(i)
-    SLEEP
   NEXT i
   CLOSE file
 END DEF
 
+DEF FNParseLine (line$)
+  IF MID$(line$, 1, 1) <> "#" THEN
+    PRINT "(Running "; CHR$(34); line$; CHR$(34); ")"
+    spacebreak = INSTR(line$, " ")
+    IF spacebreak > 0 THEN
+      keyword$ = MID$(line$, 1, spacebreak - 1)
+      parameter$ = MID$(line$, spacebreak + 1)
+
+      SELECT CASE keyword$
+        CASE "print"
+          PRINT parameter$
+      END SELECT
+    END IF
+  END IF
+END DEF
+
+' Run a script defined in the map
+DEF FNParseScript (n)
+  ' Wouldn't be basic without these dollar signs...
+  script$ = scripttext(n)
+  line$ = ""
+  ' Split the script and run line by line
+  WHILE LEN(script$) > 0
+    linebreak = INSTR(script$, CHR$(10))
+    IF linebreak > 0 THEN
+      line$ = MID$(script$, 1, linebreak - 1)
+      script$ = MID$(script$, linebreak + 1)
+    ELSE
+      line$ = script$
+      script$ = ""
+    END IF
+    dummy = FNParseLine(line$)
+  WEND
+END DEF
+
 ' Follow the player with the camera, constrain to edges of the world
 DEF FNCameraFollow
-  camera.x = player.x - 5
-  camera.y = player.y - 5
+  camera.x = player.x - (CAMWIDTH - 1) / 2
+  camera.y = player.y - (CAMHEIGHT - 1) / 2
   IF camera.x < 0 THEN camera.x = 0
   IF camera.x > mapwidth - CAMWIDTH THEN camera.x = mapwidth - CAMWIDTH
   IF camera.y < 0 THEN camera.y = 0
@@ -156,6 +190,13 @@ DEF FNMovePlayer (relx, rely)
   IF (tiles(player.x + relx, player.y + rely).solid AND MASKWALK) > 0 THEN
     player.x = player.x + relx
     player.y = player.y + rely
+
+    FOR i = 0 TO numscripts - 1
+      IF player.x >= scriptinfo[i].x1 AND player.x <= scriptinfo[i].x2 AND _
+          player.y >= scriptinfo[i].y1 AND player.y <= scriptinfo[i].y2 THEN
+        dummy = FNParseScript(i)
+      END IF
+    NEXT i
   END IF
 END DEF
 
