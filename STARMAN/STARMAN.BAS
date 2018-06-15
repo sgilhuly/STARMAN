@@ -116,19 +116,39 @@ DEF FNLoadMap (mapfile$)
   CLOSE file
 END DEF
 
-DEF FNParseLine (line$)
+DEF FNParseLine (line$, n)
   IF MID$(line$, 1, 1) <> "#" THEN
-    PRINT "(Running "; CHR$(34); line$; CHR$(34); ")"
     spacebreak = INSTR(line$, " ")
     IF spacebreak > 0 THEN
       keyword$ = MID$(line$, 1, spacebreak - 1)
       parameter$ = MID$(line$, spacebreak + 1)
-
-      SELECT CASE keyword$
-        CASE "print"
-          PRINT parameter$
-      END SELECT
+    ELSE
+      keyword$ = line$
+      parameter$ = ""
     END IF
+
+    SELECT CASE keyword$
+      CASE "println"
+        PRINT
+      CASE "print"
+        PRINT parameter$
+      CASE "warp"
+        spacebreak = INSTR(parameter$, " ")
+        player.x = VAL(MID$(parameter$, 1, spacebreak - 1))
+        player.y = VAL(MID$(parameter$, spacebreak + 1))
+      CASE "travel"
+        xdiff = player.x - scriptinfo(n).x1
+        ydiff = player.y - scriptinfo(n).y1
+        spacebreak = INSTR(parameter$, " ")
+        dummy = FNLoadMap(MID$(parameter$, 1, spacebreak - 1))
+        parameter$ = MID$(line$, spacebreak + 1)
+        spacebreak = INSTR(parameter$, " ")
+        player.x = VAL(MID$(parameter$, 1, spacebreak - 1)) + xdiff
+        player.y = VAL(MID$(parameter$, spacebreak + 1)) + ydiff
+      CASE ELSE
+        PRINT "Script error!"
+        PRINT line$
+    END SELECT
   END IF
 END DEF
 
@@ -147,7 +167,7 @@ DEF FNParseScript (n)
       line$ = script$
       script$ = ""
     END IF
-    dummy = FNParseLine(line$)
+    dummy = FNParseLine(line$, n)
   WEND
 END DEF
 
@@ -195,6 +215,7 @@ DEF FNMovePlayer (relx, rely)
       IF player.x >= scriptinfo[i].x1 AND player.x <= scriptinfo[i].x2 AND _
           player.y >= scriptinfo[i].y1 AND player.y <= scriptinfo[i].y2 THEN
         dummy = FNParseScript(i)
+        EXIT FOR
       END IF
     NEXT i
   END IF
@@ -206,8 +227,8 @@ END DEF
 ' Could use SUB, but that still requires CALL, etc...
 
 dummy = FNLoadTiles
-dummy = FNLoadMap("TESTMAP.MAP")
-player.x = 21
+dummy = FNLoadMap("DESERT.MAP")
+player.x = 29
 player.y = 14
 
 DO
